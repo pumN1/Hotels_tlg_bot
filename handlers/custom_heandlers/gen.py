@@ -1,21 +1,11 @@
 import re
 from loader import bot
 from states.user_info import MyStates
-from telebot.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from telebot.types import Message, CallbackQuery, InputMediaPhoto
 from utils.misc import reqeust
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from datetime import datetime, date, timedelta
-
-
-def city_markup(user_city):
-    data_resp = reqeust.city_detail_request(user_city)
-    cities = [{'destination_id': region['regionId'], 'city_name': region['name']}
-              for region in data_resp['data']['propertySearch']['filterMetadata']['neighborhoods']]
-    destinations = InlineKeyboardMarkup()
-    for city in cities:
-        destinations.row(InlineKeyboardButton(text=city['city_name'],
-                                              callback_data=city['destination_id']))
-    return destinations
+from keyboards.inline import city_clarification, additional_info
 
 
 @bot.message_handler(state=MyStates.city)
@@ -25,7 +15,7 @@ def get_local_city(message: Message) -> None:
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
             data['city'] = message.text
 
-        bot.send_message(message.chat.id, 'Уточните, пожалуйста:', reply_markup=city_markup(message.text))
+        bot.send_message(message.chat.id, 'Уточните, пожалуйста:', reply_markup=city_clarification.city_markup(message.text))
 
     else:
         bot.send_message(message.chat.id, 'Город может содержать только буквы')
@@ -76,15 +66,6 @@ def get_calendar(call):
         bot.send_message(call.message.chat.id, 'Сколько ночей?')
 
 
-def dop_markup(id_hotel):
-    keyboard = InlineKeyboardMarkup()
-    keyboard.add(
-        InlineKeyboardButton(text='Фото', callback_data=f'{id_hotel}'),
-        InlineKeyboardButton(text='Ссылка на сайт', url=f'https://www.hotels.com/h{id_hotel}.Hotel-Information')
-    )
-    return keyboard
-
-
 @bot.message_handler(state=MyStates.date_out)
 def get_date_out(message: Message) -> None:
     with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
@@ -100,7 +81,7 @@ def get_date_out(message: Message) -> None:
         for i_mes in data_hotels:
             bot.send_photo(message.chat.id, photo=i_mes[0],
                            caption='\n'.join([f'{key} {value}' for key, value in i_mes[1].items()]),
-                           reply_markup=dop_markup(i_mes[2]), allow_sending_without_reply=True)
+                           reply_markup=additional_info.dop_markup(i_mes[2]), allow_sending_without_reply=True)
 
 
 @bot.callback_query_handler(func=None)

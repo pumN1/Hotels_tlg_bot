@@ -174,13 +174,15 @@ def get_hotels(data):
 			}
 			hotel_info = get_hotels_info(payload_hotel)
 			hotel_info_dict = {}
+			star = hotel_info['summary']['overview'].get('propertyRating', {})
+			price = hotel['price'].get('strikeOut', {})
 			hotel_dict = {
 					'Название:': hotel['name'],
 					'Описание:': hotel_info['summary'].get('tagline', None),
-					'Звезды:': f"{hotel_info['summary']['overview'].get('propertyRating', None).get('rating', None)} ⭐",
+					'Звезды:': f"{star.get('rating', {})} ⭐" if star else 'нет данных',
 					'Рейтинг:': hotel_info['reviewInfo']['summary']['overallScoreWithDescriptionA11y'].get('value', None).split('/')[0],
 					'Расстояние до центра, км:': hotel['destinationInfo']['distanceFromDestination'].get('value', None),
-					# 'Цена за 1 ночь, $:': round(hotel['price'].get('strikeOut', None).get('amount', None), 2),
+					'Цена за 1 ночь, $:': round(price.get('amount', {}), 2) if price else 'нет данных',
 					'Цена за 1 ночь со скидкой, $:': round(hotel['price']['lead'].get('amount', None), 2),
 					'Цена за все время, включая налоги и сборы:':
 						hotel['price']['displayMessages'][1]['lineItems'][0].get('value', None).split()[0],
