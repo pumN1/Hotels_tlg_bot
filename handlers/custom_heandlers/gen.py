@@ -16,18 +16,20 @@ def get_local_city(message: Message) -> None:
             data['city'] = message.text
 
         bot.send_message(message.chat.id, 'Уточните, пожалуйста:', reply_markup=city_clarification.city_markup(message.text))
-
     else:
         bot.send_message(message.chat.id, 'Город может содержать только буквы')
 
 
 @bot.callback_query_handler(func=None, state=MyStates.local_city)
 def call_local_city(call: CallbackQuery) -> None:
-    bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
     with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['local_city'] = call.data
-    if call.data:
-        bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
+        if data['command'] == 'bestdeal':
+            bot.set_state(call.from_user.id, MyStates.price_range, call.message.chat.id)
+            bot.send_message(call.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+        elif call.data:
+            bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
+            bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
 
 
 @bot.message_handler(state=MyStates.num_hotels)

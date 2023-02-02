@@ -1,15 +1,16 @@
 import json
 import requests
 from config_data import config
+from handlers.custom_heandlers.bestdeal import get_hotels_list
 
 
 headers = {
 	"content-type": "application/json",
-    "X-RapidAPI-Key": config.RAPID_API_KEY,
-    "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
+	"X-RapidAPI-Key": config.RAPID_API_KEY,
+	"X-RapidAPI-Host": "hotels4.p.rapidapi.com"
 }
-#
-#
+
+
 def api_request(method_endswith, params, method_type):
 	"""
 	Args:
@@ -20,16 +21,16 @@ def api_request(method_endswith, params, method_type):
 	Returns:
 
 	"""
-	try:
-		url = f"https://hotels4.p.rapidapi.com/{method_endswith}"
-	#
-		# В зависимости от типа запроса вызываем соответствующую функцию
-		if method_type == 'GET':
-			return get_request(url=url, params=params)
-		else:
-			return post_request(url=url, params=params)
-	except:
-		api_request(method_endswith, params, method_type)
+	# try:
+	url = f"https://hotels4.p.rapidapi.com/{method_endswith}"
+#
+	# В зависимости от типа запроса вызываем соответствующую функцию
+	if method_type == 'GET':
+		return get_request(url=url, params=params)
+	else:
+		return post_request(url=url, params=params)
+	# except:
+	# 	api_request(method_endswith, params, method_type)
 #
 #
 def get_request(url, params):
@@ -64,13 +65,18 @@ def city_request(city):
 	Returns:
 
 	"""
-	try:
-		res = api_request('locations/v3/search', {'q': city, 'locale': 'ru_RU'}, 'GET')
-		data = json.loads(res)
-		city_id = data['sr'][0]['gaiaId']
-		return city_id
-	except:
-		city_request(city)
+	# try:
+	res = api_request('locations/v3/search', {'q': city, 'locale': 'ru_RU'}, 'GET')
+	# city_id = ''
+	for i_data in json.loads(res)['sr']:
+		if i_data['type'] == "CITY":
+			city_id = i_data['gaiaId']
+		# elif i_data['type'] == "NEIGHBORHOOD":
+		# 	print('NEIGHBORHOOD:', i_data['regionNames']['fullName'])
+			return city_id
+	# except:
+	# 	print('Ошибка запроса city_request')
+	# 	raise Exception('Ошибка запроса city_request')
 
 
 # Отели
@@ -94,11 +100,11 @@ def city_detail_request(city):
 		"rooms": [
 			{
 				"adults": 2,
-				"children": [{"age": 5}, {"age": 7}]
+				"children": []
 			}
 		],
 		"resultsStartingIndex": 0,
-		"resultsSize": 200,
+		"resultsSize": 1,
 		"sort": "PRICE_LOW_TO_HIGH",
 		"filters": {"price": {
 			"max": 150,
@@ -108,10 +114,10 @@ def city_detail_request(city):
 
 	res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
 	if res:
-		data = json.loads(res)
+		data = json.loads(res)['data']['propertySearch']['filterMetadata'].get('neighborhoods')
 		return data
 	else:
-		city_detail_request(city)
+		print('Ошибка запроса city_detail_request')
 
 
 def get_hotels_info(payload):
@@ -121,30 +127,23 @@ def get_hotels_info(payload):
 	return hotel_info
 
 
-def get_hotels(data):
+def get_hotels(data_states):
 	hotel_info_list = []
-	sort_order = ''
-	if data.get('command') == 'lowprice':
-		sort_order = 'PRICE_LOW_TO_HIGH'
-	elif data.get('command') == 'highprice':
-		sort_order ='PRICE_HIGHEST_FIRST'
-	elif data.get('command') == 'bestdeal':
-		sort_order = 'DISTANCE_FROM_LANDMARK'
 	payload = {
 		"currency": "USD",
 		"eapid": 1,
 		"locale": "ru_RU",
 		"siteId": 300000001,
-		"destination": {"regionId": f"{data['local_city']}"},
+		"destination": {"regionId": f"{data_states['local_city']}"},
 		"checkInDate": {
-			"day": data['date_in'].day,
-			"month": data['date_in'].month,
-			"year": data['date_in'].year
+			"day": data_states['date_in'].day,
+			"month": data_states['date_in'].month,
+			"year": data_states['date_in'].year
 		},
 		"checkOutDate": {
-			"day": data['date_out'].day,
-			"month": data['date_out'].month,
-			"year": data['date_out'].year
+			"day": data_states['date_out'].day,
+			"month": data_states['date_out'].month,
+			"year": data_states['date_out'].year
 		},
 		"rooms": [
 			{
@@ -153,17 +152,31 @@ def get_hotels(data):
 			}
 		],
 		"resultsStartingIndex": 0,
-		"resultsSize": int(data['num_hotels']),
-		"sort": sort_order,
+		"resultsSize": 200,
+		"sort": 'PRICE_LOW_TO_HIGH',
 		"filters": {"price": {
-			"max": 150,
-			"min": 40
+			"max": 2000,
+			"min": 1
 		}}
 	}
+	if data_states.get('command') == 'lowprice':
+		payload["resultsSize"] = int(data_states['num_hotels'])
+	elif data_states.get('command') == 'bestdeal':
+		# payload["sort"] = 'DISTANCE'
+		payload['filters']["price"]["max"] = int(data_states['price_range'].split('-')[1])
+		payload['filters']["price"]["min"] = int(data_states['price_range'].split('-')[0])
 	res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
 	if res:
 		data = json.loads(res)
 		hotels_list = data['data']['propertySearch']['properties']
+		if data_states.get('command') == 'highprice':
+			hotels_list = hotels_list[-1:-(int(data_states['num_hotels'])+1):-1]
+		if data_states.get('command') == 'bestdeal':
+			hotels_list = get_hotels_list(
+				hotels_list=json.loads(res)['data']['propertySearch']['properties'],
+				dist_range=data_states.get('dist_range'),
+				num_hotels=int(data_states['num_hotels'])
+			)
 		for hotel in hotels_list:
 			payload_hotel = {
 				"currency": "USD",
@@ -178,15 +191,15 @@ def get_hotels(data):
 			price = hotel['price'].get('strikeOut', {})
 			hotel_dict = {
 					'Название:': hotel['name'],
-					'Описание:': hotel_info['summary'].get('tagline', None),
-					'Звезды:': f"{star.get('rating', {})} ⭐" if star else 'нет данных',
-					'Рейтинг:': hotel_info['reviewInfo']['summary']['overallScoreWithDescriptionA11y'].get('value', None).split('/')[0],
-					'Расстояние до центра, км:': hotel['destinationInfo']['distanceFromDestination'].get('value', None),
-					'Цена за 1 ночь, $:': round(price.get('amount', {}), 2) if price else 'нет данных',
-					'Цена за 1 ночь со скидкой, $:': round(hotel['price']['lead'].get('amount', None), 2),
+					'Описание:': hotel_info['summary'].get('tagline'),
+					'Звезды:': f"{star.get('rating', {})} ⭐" if star else 'нет звезд',
+					'Рейтинг:': hotel_info['reviewInfo']['summary']['overallScoreWithDescriptionA11y'].get('value').split('/')[0],
+					'Расстояние до центра, км:': hotel['destinationInfo']['distanceFromDestination'].get('value'),
+					'Цена за 1 ночь, $:': round(price.get('amount', {}), 2) if price else None,
+					'Цена за 1 ночь со скидкой, $:': round(hotel['price']['lead'].get('amount'), 2),
 					'Цена за все время, включая налоги и сборы:':
-						hotel['price']['displayMessages'][1]['lineItems'][0].get('value', None).split()[0],
-					'Адрес:': hotel_info['summary']['location']['address'].get('addressLine', None),
+						hotel['price']['displayMessages'][1]['lineItems'][0].get('value').split()[0],
+					'Адрес:': hotel_info['summary']['location']['address'].get('addressLine'),
 				}
 
 			for key, value in hotel_dict.items():
@@ -196,4 +209,4 @@ def get_hotels(data):
 									hotel_info_dict, hotel['id']])
 		return hotel_info_list
 	else:
-		get_hotels(payload)
+		print('Ошибка запроса get_hotels')
