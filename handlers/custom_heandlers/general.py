@@ -1,3 +1,4 @@
+import json
 import re
 from loader import bot
 from states.user_info import MyStates
@@ -6,6 +7,34 @@ from utils.misc import reqeust
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from datetime import datetime, date, timedelta
 from keyboards.inline import city_clarification, additional_info
+from peewee import *
+
+
+db = SqliteDatabase('database/history.db')
+
+
+class PersonRequest(Model):
+    id_chat = IntegerField()
+    date_time = DateTimeField()
+    commands = CharField()
+    results = IntegerField()
+
+    class Meta:
+        database = db  # модель будет использовать базу данных 'history.db'
+
+
+class Hotel(Model):
+    id_query = IntegerField()
+    hotel_link = CharField()
+    hotel_info = TextField()
+    hotel_id = IntegerField()
+
+    class Meta:
+        database = db
+
+
+PersonRequest.create_table()
+Hotel.create_table()
 
 
 @bot.message_handler(state=MyStates.city)
@@ -15,7 +44,8 @@ def get_local_city(message: Message) -> None:
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
             data['city'] = message.text
 
-        bot.send_message(message.chat.id, 'Уточните, пожалуйста:', reply_markup=city_clarification.city_markup(message.text))
+        bot.send_message(message.chat.id, 'Уточните, пожалуйста:',
+                         reply_markup=city_clarification.city_markup(message.text))
     else:
         bot.send_message(message.chat.id, 'Город может содержать только буквы')
 
@@ -68,6 +98,13 @@ def get_calendar(call):
         bot.send_message(call.message.chat.id, 'Сколько ночей?')
 
 
+def send_query_results(chat_id: int, hotels: list) -> None:
+    for i_hotel in hotels:
+        bot.send_photo(chat_id, photo=i_hotel[0],
+                       caption='\n'.join([f'{key} {value}' for key, value in i_hotel[1].items()]),
+                       reply_markup=additional_info.dop_markup(i_hotel[2]), allow_sending_without_reply=True)
+
+
 @bot.message_handler(state=MyStates.date_out)
 def get_date_out(message: Message) -> None:
     with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
@@ -77,17 +114,29 @@ def get_date_out(message: Message) -> None:
     loading_id = bot.send_message(message.chat.id, 'Ищем..')
 
     data_hotels = reqeust.get_hotels(data)
+    new_row = PersonRequest.create(
+        id_chat=message.from_user.id,
+        date_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        commands=data['command'],
+        results=len(data_hotels),
+    )
 
+    for i_hotel in data_hotels:
+        Hotel.create(
+            id_query=PersonRequest.get(new_row.id),
+            hotel_link=i_hotel[0],
+            hotel_info=json.dumps(i_hotel[1]),
+            hotel_id=i_hotel[2]
+        )
     if data_hotels:
         bot.delete_message(message.chat.id, loading_id.message_id)
-        for i_mes in data_hotels:
-            bot.send_photo(message.chat.id, photo=i_mes[0],
-                           caption='\n'.join([f'{key} {value}' for key, value in i_mes[1].items()]),
-                           reply_markup=additional_info.dop_markup(i_mes[2]), allow_sending_without_reply=True)
+        send_query_results(message.chat.id, data_hotels)
+    bot.set_state(message.from_user.id, MyStates.dop_info, message.chat.id)
 
 
-@bot.callback_query_handler(func=None)
+@bot.callback_query_handler(func=None, state=MyStates.dop_info)
 def call_dop_info(call: CallbackQuery) -> None:
+    if call:
         payload_hotel = {
             "currency": "USD",
             "eapid": 1,

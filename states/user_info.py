@@ -10,3 +10,5 @@ class MyStates(StatesGroup):
     date_out = State()
     price_range = State()
     dist_range = State()
+    history = State()
+    dop_info = State()
