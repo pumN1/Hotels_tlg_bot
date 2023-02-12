@@ -21,7 +21,7 @@ def api_request(method_endswith, params, method_type):
         method_type: Метод\тип запроса GET\POST
 
     Returns:
-
+        функцию GET или POST запроса
     """
     try:
         url = f"https://hotels4.p.rapidapi.com/{method_endswith}"
@@ -36,6 +36,13 @@ def api_request(method_endswith, params, method_type):
 #
 #
 def get_request(url, params):
+    """
+    Args:
+        url: url-адрес
+        params: json-файл с необходимым набором данных для запроса
+    Returns:
+        response: тело ответа на get-запрос
+    """
     try:
         response = requests.get(url=url, headers=headers, params=params, timeout=15)
         if response.status_code == requests.codes.ok:
@@ -50,7 +57,7 @@ def post_request(url: str, params: Dict) -> str:
         url: url-адрес
         params: json-файл с необходимым набором данных для запроса
     Returns:
-        response: тело ответа на запрос
+        response: тело ответа на post-запрос
     """
     try:
         response = requests.post(url=url,  json=params, headers=headers, timeout=15)
@@ -172,8 +179,8 @@ def get_hotels(data_states: Dict) -> List:
             },
             "rooms": [
                 {
-                    "adults": 2,
-                    "children": []
+                    "adults": data_states['num_adults'],
+                    "children": data_states['num_children']
                 }
             ],
             "resultsStartingIndex": 0,

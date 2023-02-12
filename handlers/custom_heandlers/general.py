@@ -6,7 +6,7 @@ from telebot.types import Message, CallbackQuery, InputMediaPhoto
 from utils.misc import reqeust
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from datetime import datetime, date, timedelta
-from keyboards.inline import city_clarification, additional_info
+from keyboards.inline import city_clarification, additional_info, children_is_choice
 from peewee import *
 
 
@@ -54,12 +54,51 @@ def get_local_city(message: Message) -> None:
 def call_local_city(call: CallbackQuery) -> None:
     with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['local_city'] = call.data
-        if data['command'] == 'bestdeal':
-            bot.set_state(call.from_user.id, MyStates.price_range, call.message.chat.id)
-            bot.send_message(call.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
-        elif call.data:
-            bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
-            bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    bot.set_state(call.from_user.id, MyStates.num_adults, call.message.chat.id)
+    bot.send_message(call.message.chat.id, 'Введите количество взрослых:')
+
+
+@bot.message_handler(state=MyStates.num_adults)
+def get_adults_pass(message: Message) -> None:
+    if message.text.isdigit():
+        bot.set_state(message.from_user.id, MyStates.num_children, message.chat.id)
+        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            data['num_adults'] = message.text
+    bot.send_message(message.chat.id, 'Будут ли с вами дети?', reply_markup=children_is_choice.choices())
+
+
+@bot.callback_query_handler(func=None, state=MyStates.num_children)
+def call_children_pass(call: CallbackQuery) -> None:
+    if call.data == 'no':
+        with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
+            data['num_children'] = []
+            if data['command'] == 'bestdeal':
+                bot.set_state(call.from_user.id, MyStates.price_range, call.message.chat.id)
+                bot.send_message(call.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+            elif call.data:
+                bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
+                bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    elif call.data == 'yes':
+        bot.set_state(call.from_user.id, MyStates.age_children, call.message.chat.id)
+        bot.send_message(call.message.chat.id, 'Введите возраст детей через пробел:')
+
+
+@bot.message_handler(state=MyStates.age_children)
+def get_children_is_age(message: Message) -> None:
+    if all(num.isdigit() or num.isspace() for num in message.text):
+        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            children_list = []
+            for age in message.text.split():
+                children_list.append(dict(age=int(age)))
+            data['num_children'] = children_list
+            if data['command'] == 'bestdeal':
+                bot.set_state(message.from_user.id, MyStates.price_range, message.chat.id)
+                bot.send_message(message.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+            else:
+                bot.set_state(message.from_user.id, MyStates.num_hotels, message.chat.id)
+                bot.send_message(message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    else:
+        bot.send_message(message.chat.id, 'Возраст может быть только цифрами')
 
 
 @bot.message_handler(state=MyStates.num_hotels)
