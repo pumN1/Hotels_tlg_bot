@@ -5,7 +5,7 @@
 Бот написан на Python 3.10. 
 Для работы бота необходимо дополнительно установить библиотеки из файла <b>requirements.txt</b>. 
 
-Для получения токена бота необходимо обратиться к <link href=https://t.me/BotFather>@BotFather</link>.
+Для получения токена бота необходимо обратиться к [@BotFather](https://t.me/BotFather).
 
 Бот использует API "rapidapi.com". Для работы с данным API необходимо зарегистрироваться на сайте и получить свой RAPID_API_KEY:
 <pre>headers = {
@@ -14,7 +14,7 @@
     "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
 }</pre>
 
-Для работы с БД используется ORM Peewee. <link href=http://docs.peewee-orm.com/en/latest/>См.документацию</link>. 
+Для работы с БД используется ORM Peewee. [См.документацию](http://docs.peewee-orm.com/en/latest/) 
 
 <h2>Installation</h2>
 В отдельном каталоге создайте виртуальное окружение:
