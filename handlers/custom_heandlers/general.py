@@ -41,11 +41,16 @@ Hotel.create_table()
 def get_local_city(message: Message) -> None:
     if re.fullmatch(r'[^\d\n]*', message.text):
         bot.set_state(message.from_user.id, MyStates.local_city, message.chat.id)
-        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            data['city'] = message.text
-
-        bot.send_message(message.chat.id, 'Уточните, пожалуйста:',
-                         reply_markup=city_clarification.city_markup(message.text))
+        # with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        #     data['city'] = message.text
+        data_resp = reqeust.city_request(message.text
+                                         )
+        if not data_resp:
+            bot.send_message(message.chat.id, 'Такой город не найден, попробуйте еще раз.')
+            bot.set_state(message.from_user.id, MyStates.city, message.chat.id)
+        else:
+            bot.send_message(message.chat.id, 'Уточните, пожалуйста:',
+                             reply_markup=city_clarification.city_markup(data_resp))
     else:
         bot.send_message(message.chat.id, 'Город может содержать только буквы')
 
@@ -63,7 +68,7 @@ def get_adults_pass(message: Message) -> None:
     if message.text.isdigit():
         bot.set_state(message.from_user.id, MyStates.num_children, message.chat.id)
         with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            data['num_adults'] = message.text
+            data['num_adults'] = int(message.text)
     bot.send_message(message.chat.id, 'Будут ли с вами дети?', reply_markup=children_is_choice.choices())
 
 
@@ -93,7 +98,7 @@ def get_children_is_age(message: Message) -> None:
             data['num_children'] = children_list
             if data['command'] == 'bestdeal':
                 bot.set_state(message.from_user.id, MyStates.price_range, message.chat.id)
-                bot.send_message(message.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+                bot.send_message(message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
             else:
                 bot.set_state(message.from_user.id, MyStates.num_hotels, message.chat.id)
                 bot.send_message(message.chat.id, 'Сколько отелей показать (максимум 6)?')
