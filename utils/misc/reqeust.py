@@ -44,6 +44,7 @@ def get_request(url, params):
         response: тело ответа на get-запрос
     """
     try:
+        print(headers)
         response = requests.get(url=url, headers=headers, params=params, timeout=15)
         if response.status_code == requests.codes.ok:
             return response.text
@@ -60,6 +61,7 @@ def post_request(url: str, params: Dict) -> str:
         response: тело ответа на post-запрос
     """
     try:
+        print(headers)
         response = requests.post(url=url,  json=params, headers=headers, timeout=15)
         if response.status_code == requests.codes.ok:
             return response.text
@@ -83,7 +85,7 @@ def city_request(city: str) -> list:
         #         city_id = i_data['gaiaId']
         #     elif i_data['type'] == "NEIGHBORHOOD":
         neighborhoods = [{'destination_id': i_data['gaiaId'], 'name': i_data['regionNames'].get('fullName')}
-                         for i_data in dest if i_data['type'] == "NEIGHBORHOOD"]
+                         for i_data in dest if i_data['type'] == "NEIGHBORHOOD" or i_data['type'] == "CITY"]
         return neighborhoods
     except Exception as ex:
         logger.debug('Ошибка запроса id города city_request')
@@ -201,6 +203,7 @@ def get_hotels(data_states: Dict) -> List:
         elif data_states.get('command') == 'bestdeal':
             payload['filters']["price"]["max"] = int(data_states['price_range'].split('-')[1])
             payload['filters']["price"]["min"] = int(data_states['price_range'].split('-')[0])
+        logger.debug(payload)
         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
         if res:
             data = json.loads(res)

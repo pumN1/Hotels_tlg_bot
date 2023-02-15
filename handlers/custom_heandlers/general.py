@@ -1,3 +1,4 @@
+from loguru import logger
 import json
 import re
 from loader import bot
@@ -156,8 +157,9 @@ def get_date_out(message: Message) -> None:
         data['date_out'] = result
         bot.send_message(message.chat.id, 'Дата выезда: {date_ar}'.format(date_ar=result))
     loading_id = bot.send_message(message.chat.id, 'Ищем..')
-
+    logger.debug(data)
     data_hotels = reqeust.get_hotels(data)
+    logger.debug(data_hotels)
     new_row = PersonRequest.create(
         id_chat=message.from_user.id,
         date_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
