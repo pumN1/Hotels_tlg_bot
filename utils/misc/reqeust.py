@@ -21,7 +21,7 @@ def api_request(method_endswith, params, method_type):
         method_type: Метод\тип запроса GET\POST
 
     Returns:
-
+        функцию GET или POST запроса
     """
     try:
         url = f"https://hotels4.p.rapidapi.com/{method_endswith}"
@@ -36,7 +36,15 @@ def api_request(method_endswith, params, method_type):
 #
 #
 def get_request(url, params):
+    """
+    Args:
+        url: url-адрес
+        params: json-файл с необходимым набором данных для запроса
+    Returns:
+        response: тело ответа на get-запрос
+    """
     try:
+        print(headers)
         response = requests.get(url=url, headers=headers, params=params, timeout=15)
         if response.status_code == requests.codes.ok:
             return response.text
@@ -50,9 +58,10 @@ def post_request(url: str, params: Dict) -> str:
         url: url-адрес
         params: json-файл с необходимым набором данных для запроса
     Returns:
-        response: тело ответа на запрос
+        response: тело ответа на post-запрос
     """
     try:
+        print(headers)
         response = requests.post(url=url,  json=params, headers=headers, timeout=15)
         if response.status_code == requests.codes.ok:
             return response.text
@@ -60,7 +69,7 @@ def post_request(url: str, params: Dict) -> str:
         raise TimeoutError()
 
 
-def city_request(city: str) -> int:
+def city_request(city: str) -> list:
     """
     Функция для получения id города
      Args:
@@ -70,60 +79,65 @@ def city_request(city: str) -> int:
     """
     try:
         res = api_request('locations/v3/search', {'q': city, 'locale': 'ru_RU'}, 'GET')
-        for i_data in json.loads(res)['sr']:
-            if i_data['type'] == "CITY":
-                city_id = i_data['gaiaId']
-                return city_id
-    except:
+        dest = json.loads(res)['sr']
+        # for i_data in json.loads(res)['sr']:
+        #     if not city_id and i_data['type'] == "CITY":
+        #         city_id = i_data['gaiaId']
+        #     elif i_data['type'] == "NEIGHBORHOOD":
+        neighborhoods = [{'destination_id': i_data['gaiaId'], 'name': i_data['regionNames'].get('fullName')}
+                         for i_data in dest if i_data['type'] == "NEIGHBORHOOD" or i_data['type'] == "CITY"]
+        return neighborhoods
+    except Exception as ex:
         logger.debug('Ошибка запроса id города city_request')
+        logger.error(ex.__repr__())
 
 
 # Отели
-def city_detail_request(city: str) -> Dict:
-    """
-    Функция для уточнения местности для поиска отелей
-    Args:
-        city: название города из сообщения пользователя
-    Returns:
-        data: dict: словарь окрестностей города для поиска отелей
-    """
-    payload = {
-        "currency": "USD",
-        "eapid": 1,
-        "locale": "ru_RU",
-        "siteId": 300000001,
-        "destination": {"regionId": f"{city_request(city)}"},
-        "checkInDate": {
-            "day": 10,
-            "month": 10,
-            "year": 2022
-        },
-        "checkOutDate": {
-            "day": 15,
-            "month": 10,
-            "year": 2022
-        },
-        "rooms": [
-            {
-                "adults": 2,
-                "children": []
-            }
-        ],
-        "resultsStartingIndex": 0,
-        "resultsSize": 1,
-        "sort": "PRICE_LOW_TO_HIGH",
-        "filters": {"price": {
-            "max": 150,
-            "min": 100
-        }}
-    }
-    try:
-        res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
-        if res:
-            data = json.loads(res)['data']['propertySearch']['filterMetadata'].get('neighborhoods')
-            return data
-    except:
-        logger.debug('Ошибка запроса окрестностей города city_detail_request')
+# def city_detail_request(city: str) -> Dict:
+#     """
+#     Функция для уточнения местности для поиска отелей
+#     Args:
+#         city: название города из сообщения пользователя
+#     Returns:
+#         data: dict: словарь окрестностей города для поиска отелей
+#     """
+#     payload = {
+#         "currency": "USD",
+#         "eapid": 1,
+#         "locale": "ru_RU",
+#         "siteId": 300000001,
+#         "destination": {"regionId": f"{city_request(city)}"},
+#         "checkInDate": {
+#             "day": 10,
+#             "month": 10,
+#             "year": 2022
+#         },
+#         "checkOutDate": {
+#             "day": 15,
+#             "month": 10,
+#             "year": 2022
+#         },
+#         "rooms": [
+#             {
+#                 "adults": 2,
+#                 "children": []
+#             }
+#         ],
+#         "resultsStartingIndex": 0,
+#         "resultsSize": 1,
+#         "sort": "PRICE_LOW_TO_HIGH",
+#         "filters": {"price": {
+#             "max": 150,
+#             "min": 100
+#         }}
+#     }
+#     try:
+#         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
+#         if res:
+#             data = json.loads(res)['data']['propertySearch']['filterMetadata'].get('neighborhoods')
+#             return data
+#     except:
+#         logger.debug('Ошибка запроса окрестностей города city_detail_request')
 
 
 def get_hotels_info(payload: Dict) -> Dict:
@@ -172,8 +186,8 @@ def get_hotels(data_states: Dict) -> List:
             },
             "rooms": [
                 {
-                    "adults": 2,
-                    "children": []
+                    "adults": data_states['num_adults'],
+                    "children": data_states['num_children']
                 }
             ],
             "resultsStartingIndex": 0,
@@ -189,6 +203,7 @@ def get_hotels(data_states: Dict) -> List:
         elif data_states.get('command') == 'bestdeal':
             payload['filters']["price"]["max"] = int(data_states['price_range'].split('-')[1])
             payload['filters']["price"]["min"] = int(data_states['price_range'].split('-')[0])
+        logger.debug(payload)
         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
         if res:
             data = json.loads(res)

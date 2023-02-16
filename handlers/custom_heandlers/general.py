@@ -1,3 +1,4 @@
+from loguru import logger
 import json
 import re
 from loader import bot
@@ -6,7 +7,7 @@ from telebot.types import Message, CallbackQuery, InputMediaPhoto
 from utils.misc import reqeust
 from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from datetime import datetime, date, timedelta
-from keyboards.inline import city_clarification, additional_info
+from keyboards.inline import city_clarification, additional_info, children_is_choice
 from peewee import *
 
 
@@ -41,11 +42,16 @@ Hotel.create_table()
 def get_local_city(message: Message) -> None:
     if re.fullmatch(r'[^\d\n]*', message.text):
         bot.set_state(message.from_user.id, MyStates.local_city, message.chat.id)
-        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            data['city'] = message.text
-
-        bot.send_message(message.chat.id, 'Уточните, пожалуйста:',
-                         reply_markup=city_clarification.city_markup(message.text))
+        # with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        #     data['city'] = message.text
+        data_resp = reqeust.city_request(message.text
+                                         )
+        if not data_resp:
+            bot.send_message(message.chat.id, 'Такой город не найден, попробуйте еще раз.')
+            bot.set_state(message.from_user.id, MyStates.city, message.chat.id)
+        else:
+            bot.send_message(message.chat.id, 'Уточните, пожалуйста:',
+                             reply_markup=city_clarification.city_markup(data_resp))
     else:
         bot.send_message(message.chat.id, 'Город может содержать только буквы')
 
@@ -54,12 +60,51 @@ def get_local_city(message: Message) -> None:
 def call_local_city(call: CallbackQuery) -> None:
     with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['local_city'] = call.data
-        if data['command'] == 'bestdeal':
-            bot.set_state(call.from_user.id, MyStates.price_range, call.message.chat.id)
-            bot.send_message(call.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
-        elif call.data:
-            bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
-            bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    bot.set_state(call.from_user.id, MyStates.num_adults, call.message.chat.id)
+    bot.send_message(call.message.chat.id, 'Введите количество взрослых:')
+
+
+@bot.message_handler(state=MyStates.num_adults)
+def get_adults_pass(message: Message) -> None:
+    if message.text.isdigit():
+        bot.set_state(message.from_user.id, MyStates.num_children, message.chat.id)
+        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            data['num_adults'] = int(message.text)
+    bot.send_message(message.chat.id, 'Будут ли с вами дети?', reply_markup=children_is_choice.choices())
+
+
+@bot.callback_query_handler(func=None, state=MyStates.num_children)
+def call_children_pass(call: CallbackQuery) -> None:
+    if call.data == 'no':
+        with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
+            data['num_children'] = []
+            if data['command'] == 'bestdeal':
+                bot.set_state(call.from_user.id, MyStates.price_range, call.message.chat.id)
+                bot.send_message(call.message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+            elif call.data:
+                bot.set_state(call.from_user.id, MyStates.num_hotels, call.message.chat.id)
+                bot.send_message(call.message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    elif call.data == 'yes':
+        bot.set_state(call.from_user.id, MyStates.age_children, call.message.chat.id)
+        bot.send_message(call.message.chat.id, 'Введите возраст детей через пробел:')
+
+
+@bot.message_handler(state=MyStates.age_children)
+def get_children_is_age(message: Message) -> None:
+    if all(num.isdigit() or num.isspace() for num in message.text):
+        with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            children_list = []
+            for age in message.text.split():
+                children_list.append(dict(age=int(age)))
+            data['num_children'] = children_list
+            if data['command'] == 'bestdeal':
+                bot.set_state(message.from_user.id, MyStates.price_range, message.chat.id)
+                bot.send_message(message.chat.id, 'Укажите желаемый диапазон цен за отель в формате min-max.')
+            else:
+                bot.set_state(message.from_user.id, MyStates.num_hotels, message.chat.id)
+                bot.send_message(message.chat.id, 'Сколько отелей показать (максимум 6)?')
+    else:
+        bot.send_message(message.chat.id, 'Возраст может быть только цифрами')
 
 
 @bot.message_handler(state=MyStates.num_hotels)
@@ -112,8 +157,9 @@ def get_date_out(message: Message) -> None:
         data['date_out'] = result
         bot.send_message(message.chat.id, 'Дата выезда: {date_ar}'.format(date_ar=result))
     loading_id = bot.send_message(message.chat.id, 'Ищем..')
-
+    logger.debug(data)
     data_hotels = reqeust.get_hotels(data)
+    logger.debug(data_hotels)
     new_row = PersonRequest.create(
         id_chat=message.from_user.id,
         date_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
