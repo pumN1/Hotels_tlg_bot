@@ -178,7 +178,8 @@ def get_date_out(message: Message) -> None:
             )
         if data_hotels:
             bot.delete_message(message.chat.id, loading_id.message_id)
-            if len(data_hotels) < data['num_hotels']:
+            xxx = data['num_hotels']
+            if len(data_hotels) < int(data['num_hotels']):
                 bot.send_message(message.chat.id, 'По вашему запросу найдено всего {} отель(ей)'.format(
                     len(data_hotels)))
             send_query_results(message.chat.id, data_hotels)

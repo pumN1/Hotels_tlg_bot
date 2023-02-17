@@ -150,7 +150,7 @@ def get_hotels(data_states: Dict) -> List:
             payload["resultsSize"] = int(data_states['num_hotels'])
         elif data_states.get('command') == 'bestdeal':
             payload['filters']["price"]["max"] = int(data_states['price_range'].split('-')[1])
-            payload['filters']["price"]["min"] = int(data_states['price_range'].split('-')[0])
+            payload['filters']["price"]["max"] = int(data_states['price_range'].split('-')[1])
         logger.debug(payload)
         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
         if res:
@@ -160,6 +160,7 @@ def get_hotels(data_states: Dict) -> List:
             elif data_states.get('command') == 'bestdeal':
                 hotels_list = get_hotels_list(
                     hotels_list=data,
+                    price_range=data_states.get('price_range'),
                     dist_range=data_states.get('dist_range'),
                     num_hotels=int(data_states['num_hotels'])
                 )
