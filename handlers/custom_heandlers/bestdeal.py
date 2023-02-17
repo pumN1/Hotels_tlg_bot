@@ -1,6 +1,7 @@
 from loader import bot
 from states.user_info import MyStates
 from telebot.types import Message
+from typing import List
 import re
 
 
@@ -34,7 +35,7 @@ def get_price_min(message: Message) -> None:
         bot.send_message(message.chat.id, 'Неверный формат. Попробуйте еще раз')
 
 
-def get_hotels_list(hotels_list, dist_range, num_hotels):
+def get_hotels_list(hotels_list: List, dist_range: str, num_hotels: int) -> List:
     dist_min = int(dist_range.split('-')[0])
     dist_max = int(dist_range.split('-')[1])
     upd_hot_list = []
@@ -42,4 +43,5 @@ def get_hotels_list(hotels_list, dist_range, num_hotels):
         if dist_min <= hotel.get('destinationInfo').get('distanceFromDestination').get('value') <= dist_max:
             upd_hot_list.append(hotel)
             if len(upd_hot_list) == num_hotels:
-                return upd_hot_list
+                break
+    return upd_hot_list

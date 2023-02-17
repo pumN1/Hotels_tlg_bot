@@ -80,64 +80,12 @@ def city_request(city: str) -> list:
     try:
         res = api_request('locations/v3/search', {'q': city, 'locale': 'ru_RU'}, 'GET')
         dest = json.loads(res)['sr']
-        # for i_data in json.loads(res)['sr']:
-        #     if not city_id and i_data['type'] == "CITY":
-        #         city_id = i_data['gaiaId']
-        #     elif i_data['type'] == "NEIGHBORHOOD":
         neighborhoods = [{'destination_id': i_data['gaiaId'], 'name': i_data['regionNames'].get('fullName')}
                          for i_data in dest if i_data['type'] == "NEIGHBORHOOD" or i_data['type'] == "CITY"]
         return neighborhoods
     except Exception as ex:
         logger.debug('Ошибка запроса id города city_request')
         logger.error(ex.__repr__())
-
-
-# Отели
-# def city_detail_request(city: str) -> Dict:
-#     """
-#     Функция для уточнения местности для поиска отелей
-#     Args:
-#         city: название города из сообщения пользователя
-#     Returns:
-#         data: dict: словарь окрестностей города для поиска отелей
-#     """
-#     payload = {
-#         "currency": "USD",
-#         "eapid": 1,
-#         "locale": "ru_RU",
-#         "siteId": 300000001,
-#         "destination": {"regionId": f"{city_request(city)}"},
-#         "checkInDate": {
-#             "day": 10,
-#             "month": 10,
-#             "year": 2022
-#         },
-#         "checkOutDate": {
-#             "day": 15,
-#             "month": 10,
-#             "year": 2022
-#         },
-#         "rooms": [
-#             {
-#                 "adults": 2,
-#                 "children": []
-#             }
-#         ],
-#         "resultsStartingIndex": 0,
-#         "resultsSize": 1,
-#         "sort": "PRICE_LOW_TO_HIGH",
-#         "filters": {"price": {
-#             "max": 150,
-#             "min": 100
-#         }}
-#     }
-#     try:
-#         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
-#         if res:
-#             data = json.loads(res)['data']['propertySearch']['filterMetadata'].get('neighborhoods')
-#             return data
-#     except:
-#         logger.debug('Ошибка запроса окрестностей города city_detail_request')
 
 
 def get_hotels_info(payload: Dict) -> Dict:
@@ -206,16 +154,18 @@ def get_hotels(data_states: Dict) -> List:
         logger.debug(payload)
         res = api_request(method_endswith='properties/v2/list', params=payload, method_type='POST')
         if res:
-            data = json.loads(res)
-            hotels_list = data['data']['propertySearch']['properties']
+            data = json.loads(res)['data']['propertySearch']['properties']
             if data_states.get('command') == 'highprice':
-                hotels_list = hotels_list[-1:-(int(data_states['num_hotels'])+1):-1]
-            if data_states.get('command') == 'bestdeal':
+                hotels_list = data[-1:-(int(data_states['num_hotels'])+1):-1]
+            elif data_states.get('command') == 'bestdeal':
                 hotels_list = get_hotels_list(
-                    hotels_list=json.loads(res)['data']['propertySearch']['properties'],
+                    hotels_list=data,
                     dist_range=data_states.get('dist_range'),
                     num_hotels=int(data_states['num_hotels'])
                 )
+            else:
+                hotels_list = data
+            logger.debug(hotels_list)
             for hotel in hotels_list:
                 payload_hotel = {
                     "currency": "USD",
