@@ -42,8 +42,6 @@ Hotel.create_table()
 def get_local_city(message: Message) -> None:
     if re.fullmatch(r'[^\d\n]*', message.text):
         bot.set_state(message.from_user.id, MyStates.local_city, message.chat.id)
-        # with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        #     data['city'] = message.text
         data_resp = reqeust.city_request(message.text
                                          )
         if not data_resp:
@@ -160,24 +158,32 @@ def get_date_out(message: Message) -> None:
     logger.debug(data)
     data_hotels = reqeust.get_hotels(data)
     logger.debug(data_hotels)
-    new_row = PersonRequest.create(
-        id_chat=message.from_user.id,
-        date_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        commands=data['command'],
-        results=len(data_hotels),
-    )
-
-    for i_hotel in data_hotels:
-        Hotel.create(
-            id_query=PersonRequest.get(new_row.id),
-            hotel_link=i_hotel[0],
-            hotel_info=json.dumps(i_hotel[1]),
-            hotel_id=i_hotel[2]
+    if not data_hotels:
+        bot.send_message(message.chat.id, 'По вашему запросу ничего не найдено:( '
+                                          'Измените критерии и попробуйте еще раз.')
+    else:
+        new_row = PersonRequest.create(
+            id_chat=message.from_user.id,
+            date_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            commands=data['command'],
+            results=len(data_hotels),
         )
-    if data_hotels:
-        bot.delete_message(message.chat.id, loading_id.message_id)
-        send_query_results(message.chat.id, data_hotels)
-    bot.set_state(message.from_user.id, MyStates.dop_info, message.chat.id)
+
+        for i_hotel in data_hotels:
+            Hotel.create(
+                id_query=PersonRequest.get(new_row.id),
+                hotel_link=i_hotel[0],
+                hotel_info=json.dumps(i_hotel[1]),
+                hotel_id=i_hotel[2]
+            )
+        if data_hotels:
+            bot.delete_message(message.chat.id, loading_id.message_id)
+            xxx = data['num_hotels']
+            if len(data_hotels) < int(data['num_hotels']):
+                bot.send_message(message.chat.id, 'По вашему запросу найдено всего {} отель(ей)'.format(
+                    len(data_hotels)))
+            send_query_results(message.chat.id, data_hotels)
+        bot.set_state(message.from_user.id, MyStates.dop_info, message.chat.id)
 
 
 @bot.callback_query_handler(func=None, state=MyStates.dop_info)

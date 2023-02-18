@@ -1,6 +1,9 @@
+from loguru import logger
+
 from loader import bot
 from states.user_info import MyStates
 from telebot.types import Message
+from typing import List
 import re
 
 
@@ -34,12 +37,21 @@ def get_price_min(message: Message) -> None:
         bot.send_message(message.chat.id, 'Неверный формат. Попробуйте еще раз')
 
 
-def get_hotels_list(hotels_list, dist_range, num_hotels):
-    dist_min = int(dist_range.split('-')[0])
-    dist_max = int(dist_range.split('-')[1])
+def get_hotels_list(hotels_list: List, price_range: str, dist_range: str, num_hotels: int) -> List:
+    dist_min, dist_max = map(int, dist_range.split('-'))
+    price_min, price_max = map(int, price_range.split('-'))
+    # dist_min = int(dist_range.split('-')[0])
+    # dist_max = int(dist_range.split('-')[1])
     upd_hot_list = []
+    hotels_dict = dict()
     for hotel in hotels_list:
-        if dist_min <= hotel.get('destinationInfo').get('distanceFromDestination').get('value') <= dist_max:
-            upd_hot_list.append(hotel)
-            if len(upd_hot_list) == num_hotels:
-                return upd_hot_list
+        current_dist = hotel.get('destinationInfo').get('distanceFromDestination').get('value')
+        current_price = hotel['price']['lead']['amount']
+        hotels_dict[hotel.get('name')] = [current_dist, current_price]
+        if dist_min <= current_dist <= dist_max:
+            if price_min <= current_price <=  price_max:
+                upd_hot_list.append(hotel)
+                if len(upd_hot_list) == num_hotels:
+                    break
+    logger.info(hotels_dict)
+    return upd_hot_list
