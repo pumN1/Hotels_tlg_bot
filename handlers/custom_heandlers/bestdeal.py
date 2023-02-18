@@ -40,8 +40,6 @@ def get_price_min(message: Message) -> None:
 def get_hotels_list(hotels_list: List, price_range: str, dist_range: str, num_hotels: int) -> List:
     dist_min, dist_max = map(int, dist_range.split('-'))
     price_min, price_max = map(int, price_range.split('-'))
-    # dist_min = int(dist_range.split('-')[0])
-    # dist_max = int(dist_range.split('-')[1])
     upd_hot_list = []
     hotels_dict = dict()
     for hotel in hotels_list:
